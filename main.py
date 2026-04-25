@@ -1,29 +1,52 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-
-# initiate the FastAPI instance
-
-app = FastAPI()
+from sqlmodel import Field, Session, SQLModel, create_engine, select
+from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 
 # add the templates
 
-templates = Jinja2Templates(directory=r"C:\Users\azous\OneDrive\Desktop\Programming_Tutorials\Python_Tutorials\emotion-tracker\templates")
+templates = Jinja2Templates(directory="templates")
 
-# build the pydantic models
+# build the models
 
-class Entry(BaseModel):
-    text: str
-
-class EntryResponse(BaseModel):
-    id: int
+class Entry(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
     text: str
     emotion: str
     sentiment: str
+    timestamp: datetime
 
-# add storage
+class EntryCreate(SQLModel):
+    text: str
 
-entries: list[EntryResponse] = []
+# create database
+
+sqlite_file_name = "emotions.db"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+
+connect_args = {"check_same_thread": False}
+engine = create_engine(sqlite_url, connect_args=connect_args)
+
+# create database and tables on startup
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+# get session per request
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+# initiate the FastAPI instance
+
+app = FastAPI(lifespan=lifespan)
 
 # add route to homepage
 
@@ -37,28 +60,38 @@ async def home(request: Request):
 
 # get all entries (with filtering options)
 
-@app.get("/entries/", response_model=list[EntryResponse])
-async def get_entries(sentiment: str | None = None, emotion: str | None = None):
-    filtered = entries
+@app.get("/entries/", response_model=list[Entry])
+async def get_entries(
+        sentiment: str | None = None,
+        emotion: str | None = None,
+        session: Session = Depends(get_session)
+):
+    statement = select(Entry)
+
     if sentiment:
-        filtered = [entry for entry in filtered if entry.sentiment == sentiment]
+        statement = statement.where(Entry.sentiment == sentiment)
     if emotion:
-        filtered = [entry for entry in filtered if entry.emotion == emotion]
+        statement = statement.where(Entry.emotion == emotion)
+
+    filtered = session.exec(statement).all()
     return filtered
 
 # get single entry
 
-@app.get("/entries/{entry_id}", response_model=EntryResponse)
-async def get_entry(entry_id: int):
-    for entry in entries:
-        if entry.id == entry_id:
-            return entry
-    raise HTTPException(status_code=404, detail="Entry not found")
+@app.get("/entries/{entry_id}", response_model=Entry)
+async def get_entry(entry_id: int, session: Session = Depends(get_session)):
+    entry = session.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
 
 # add an entry
 
-@app.post("/emotion/", response_model=EntryResponse)
-async def create_entry(entry: Entry):
+@app.post("/emotion/", response_model=Entry)
+async def create_entry(
+        entry: EntryCreate,
+        session: Session = Depends(get_session)
+):
     """
     This code receives text from the body of a request and
     processes it to detect the overall emotion and sentiment
@@ -83,31 +116,32 @@ async def create_entry(entry: Entry):
     else:
         emotion = "not detected"
 
-    positive_words: list[str] = ["happy", "best", "satisfied", "pleased"]
-    negative_words: list[str] = ["angry", "disgusted", "afraid", "sad"]
-
-    if emotion in positive_words:
+    if emotion == "happy":
         sentiment = "positive"
-    elif emotion in negative_words:
+    elif emotion in ["anger", "sad", "fear", "disgust"]:
         sentiment = "negative"
     else:
         sentiment = "neutral"
 
-    new_entry = EntryResponse(
-        id = len(entries) + 1,
+    new_entry = Entry(
         text = entry.text,
         emotion = emotion,
-        sentiment = sentiment
+        sentiment = sentiment,
+        timestamp = datetime.now(timezone.utc)
     )
 
-    entries.append(new_entry)
+    session.add(new_entry)
+    session.commit()
+    session.refresh(new_entry)
 
     return new_entry
 
 # delete an entry
-@app.delete("/entries/{entry_id}", response_model=EntryResponse)
-async def delete_entry(entry_id: int):
-    for i, entry in enumerate(entries):
-        if entry.id == entry_id:
-            return entries.pop(i)
-    raise HTTPException(status_code=404, detail="Entry not found")
+@app.delete("/entries/{entry_id}")
+async def delete_entry(entry_id: int, session: Session = Depends(get_session)):
+    entry = session.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    session.delete(entry)
+    session.commit()
+    return {"message": "Entry deleted"}
