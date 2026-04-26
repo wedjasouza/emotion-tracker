@@ -18,38 +18,9 @@
 			    <button type="submit" class="btn btn-primary">SUBMIT</button>
 			</form>
 			<div class="mt-4" id="result"></div>
+			<h3 class="mt-5">History</h3>
+			<div id="history"></div>
 		</div>
-		<script>
-		document.addEventListener("DOMContentLoaded", function() {
-		    document.getElementById("emotionForm").addEventListener("submit", async function(e) {
-		        e.preventDefault();
-			    
-			    const text = document.getElementById("textToAnalyze").value;
-				
-				if (!text.trim()) {
-                    document.getElementById("result").innerHTML =
-                        '<div class="alert alert-warning">Please enter text.</div>';
-                    return;
-                }
-			    
-			    const response = await fetch("/emotion/", {
-			        method: "POST",
-				    headers: {
-				        "Content-Type": "application/json"
-				    },
-				    body: JSON.stringify({ text: text })
-		    	});
-			    	
-			    const data = await response.json()
-    
-                document.getElementById("result").innerHTML = `
-                    <div class="alert alert-info">
-                        <strong>Emotion:</strong> ${data.emotion}<br>
-					    <strong>Sentiment:</strong> ${data.sentiment}
-			        </div>
-			    `;
-		    });
-		});
-		</script>
+		<script src="/static/app.js"></script>
 	</body>
 </html>

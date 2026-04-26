@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -48,6 +49,10 @@ def get_session():
 
 app = FastAPI(lifespan=lifespan)
 
+# add static files
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # add route to homepage
 
 @app.get("/")
@@ -73,8 +78,11 @@ async def get_entries(
     if emotion:
         statement = statement.where(Entry.emotion == emotion)
 
-    filtered = session.exec(statement).all()
-    return filtered
+    statement = statement.order_by(Entry.timestamp.desc())
+
+    results = session.exec(statement).all()
+    
+    return results
 
 # get single entry
 
