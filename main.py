@@ -17,6 +17,7 @@ class Entry(SQLModel, table=True):
     emotion: str
     sentiment: str
     timestamp: datetime
+    updated_at: datetime | None = None
 
 class EntryCreate(SQLModel):
     text: str
@@ -44,6 +45,37 @@ async def lifespan(app: FastAPI):
 def get_session():
     with Session(engine) as session:
         yield session
+
+# get emotion + sentiment from text
+
+def analyze_text(text: str) -> tuple[str, str]:
+
+    text = text.strip().lower()
+
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided")
+
+    if "happy" in text:
+        emotion = "happy"
+    elif "sad" in text:
+        emotion = "sad"
+    elif "angry" in text or "anger" in text:
+        emotion = "anger"
+    elif "fear" in text:
+        emotion = "fear"
+    elif "disgust" in text or "disgusted" in text:
+        emotion = "disgust"
+    else:
+        emotion = "not detected"
+
+    if emotion == "happy":
+        sentiment = "positive"
+    elif emotion in ["anger", "sad", "fear", "disgust"]:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+
+    return emotion, sentiment
 
 # initiate the FastAPI instance
 
@@ -81,7 +113,7 @@ async def get_entries(
     statement = statement.order_by(Entry.timestamp.desc())
 
     results = session.exec(statement).all()
-    
+
     return results
 
 # get single entry
@@ -106,30 +138,7 @@ async def create_entry(
     of the text.
     """
 
-    text = entry.text.strip().lower()
-
-    if not text:
-        raise HTTPException(status_code=400, detail="No text provided")
-
-    if "happy" in text:
-        emotion = "happy"
-    elif "sad" in text:
-        emotion = "sad"
-    elif "angry" in text or "anger" in text:
-        emotion = "anger"
-    elif "fear" in text:
-        emotion = "fear"
-    elif "disgust" in text or "disgusted" in text:
-        emotion = "disgust"
-    else:
-        emotion = "not detected"
-
-    if emotion == "happy":
-        sentiment = "positive"
-    elif emotion in ["anger", "sad", "fear", "disgust"]:
-        sentiment = "negative"
-    else:
-        sentiment = "neutral"
+    emotion, sentiment = analyze_text(entry.text)
 
     new_entry = Entry(
         text = entry.text,
@@ -144,7 +153,31 @@ async def create_entry(
 
     return new_entry
 
+@app.put("/entries/{entry_id}", response_model=Entry)
+async def update_entry(
+        entry_id: int,
+        updated: EntryCreate,
+        session: Session = Depends(get_session)
+):
+    entry = session.get(Entry, entry_id)
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    emotion, sentiment = analyze_text(updated.text)
+
+    entry.text = updated.text
+    entry.emotion = emotion
+    entry.sentiment = sentiment
+    entry.updated_at = datetime.now(timezone.utc)
+
+    session.commit()
+    session.refresh(entry)
+
+    return entry
+
 # delete an entry
+
 @app.delete("/entries/{entry_id}")
 async def delete_entry(entry_id: int, session: Session = Depends(get_session)):
     entry = session.get(Entry, entry_id)

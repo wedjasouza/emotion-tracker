@@ -18,8 +18,58 @@
 			    <button type="submit" class="btn btn-primary">SUBMIT</button>
 			</form>
 			<div class="mt-4" id="result"></div>
-			<h3 class="mt-5">History</h3>
+			<div class="row">
+			    <div class="col-sm-2">
+					<h3 class="mt-5">History</h3>
+				</div>
+				<div class="col-sm-5"></div>
+				<div class="col-sm-1">
+				    <h4 class="mt-5">Filters:</h4>
+				</div>
+				<div class="col-sm-2">
+				    <select id="emotionFilter" class="form-select mt-5">
+					    <option value="">All Emotions</option>
+					    <option value="happy">Happy</option>
+					    <option value="sad">Sad</option>
+					    <option value="anger">Anger</option>
+					    <option value="fear">Fear</option>
+					    <option value="disgust">Disgust</option>
+					    <option value="not detected">Not Detected</option>
+					</select>
+				</div>
+				<div class="col-sm-2">
+				    <select id="sentimentFilter" class="form-select mt-5">
+					    <option value="">All Sentiments</option>
+					    <option value="positive">Positive</option>
+					    <option value="negative">Negative</option>
+					    <option value="neutral">Neutral</option>
+					</select>
+				</div>
+			</div>
 			<div id="history"></div>
+		</div>
+		<div class="modal fade" id="editScreen" tabindex="-1">
+		    <div class="modal-dialog">
+			    <div class="modal-content">
+				
+				    <div class="modal-header">
+					    <h5 class="modal-title">Edit Entry</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+					</div>
+					
+					<div class="modal-body">
+					    <textarea id="updateText" class="form-control" rows="5"></textarea>
+					</div>
+					
+					<div id="editResult"></div>
+					
+					<div class="modal-footer">
+					    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+						<button class="btn btn-danger" id="saveEditBtn">Update</button>
+					</div>
+					
+				</div>
+			</div>
 		</div>
 		<script src="/static/app.js"></script>
 	</body>
