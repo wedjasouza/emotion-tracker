@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Field, Session, SQLModel, create_engine, select, func, desc
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 # add the templates
 
@@ -21,6 +22,13 @@ class Entry(SQLModel, table=True):
 
 class EntryCreate(SQLModel):
     text: str
+
+class StatsModel(BaseModel):
+    total: int
+    positive: int
+    negative: int
+    neutral: int
+    top_emotions: list[str] | None = None
 
 # create database
 
@@ -115,6 +123,52 @@ async def get_entries(
     results = session.exec(statement).all()
 
     return results
+
+# get stats
+
+@app.get("/stats/", response_model=StatsModel)
+async def get_stats(
+        session: Session = Depends(get_session)
+):
+    total_count = session.exec(
+        select(func.count()).select_from(Entry)
+    ).one()
+
+    positive_count = session.exec(
+        select(func.count()).select_from(Entry)
+        .where(Entry.sentiment == "positive")
+    ).one()
+
+    negative_count = session.exec(
+        select(func.count()).select_from(Entry)
+        .where(Entry.sentiment == "negative")
+    ).one()
+
+    neutral_count = session.exec(
+        select(func.count()).select_from(Entry)
+        .where(Entry.sentiment == "neutral")
+    ).one()
+
+    results = session.exec(
+        select(Entry.emotion, func.count(Entry.id).label("emotion_totals"))
+        .group_by(Entry.emotion)
+    ).all()
+
+    if not results:
+        top_emotion = []
+    else:
+        max_count = max(r[1] for r in results)
+        top_emotions = [r[0] for r in results if r[1] == max_count]
+
+    stats = StatsModel(
+        total=total_count,
+        positive=positive_count,
+        negative=negative_count,
+        neutral=neutral_count,
+        top_emotions=top_emotions
+    )
+
+    return stats
 
 # get single entry
 
