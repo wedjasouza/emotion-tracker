@@ -25,11 +25,21 @@ document.addEventListener("DOMContentLoaded", function() {
 		    });
 			    	
 		    const data = await response.json();
+			
+			const emotions = data.emotion ? data.emotion.split(",") : [];
+			
+			const cleanEmotions = emotions.filter(e => e && e.trim() !== "");
     
             document.getElementById("result").innerHTML = `
                 <div class="alert alert-info">
-                    <strong>Emotion:</strong> ${data.emotion}<br>
-		            <strong>Sentiment:</strong> ${data.sentiment}
+                    <strong>Emotion:</strong> ${cleanEmotions.length > 1
+					                            ? "Tie: "
+												: ""}
+											${cleanEmotions.length
+											    ? cleanEmotions.map(formatEmotion)
+												    .join(" • ")
+											    : "Not Detected"}<br>
+		            <strong>Sentiment:</strong> ${formatEmotion(data.sentiment)}
 		        </div>
 		    `;
 		
@@ -43,8 +53,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		}
 	});
     
-	document.getElementById("emotionFilter").addEventListener("change", loadHistory)
-	document.getElementById("sentimentFilter").addEventListener("change", loadHistory)
+	document.getElementById("emotionFilter").addEventListener("change", refreshUI)
+	document.getElementById("sentimentFilter").addEventListener("change", refreshUI)
 	
     refreshUI();
 	
@@ -62,15 +72,50 @@ document.addEventListener("DOMContentLoaded", function() {
 		input.select();
 	});
 	
+	const loadMoreBtn = document.getElementById("loadMoreBtn")
+	
+	document.getElementById("loadMoreBtn").addEventListener("click", () => {
+		try {
+			loadMoreBtn.disabled = true;
+			loadMoreBtn.textContent = "Loading...";
+			
+		    async loadHistory(false);
+		} finally {
+			loadMoreBtn.disabled = false;
+			loadMoreBtn.textContent = "Load More";
+		}
+	});
+	
 });
 
-async function loadHistory() {
-	const url = filterParams();
+let offset = 0;
+const limit = 10;
+
+async function loadHistory(reset = false) {
+	let url = filterParams();
+	
+	if (reset) offset = 0;
+	
+	if (url === "/entries/") {
+		url += `?limit=${limit}&offset=${offset}`;
+	} else {
+		url += `&limit=${limit}&offset=${offset}`;
+	}
 	
 	const response = await fetch(url);
 	const data = await response.json();
 	
-	renderCards(data);
+	if (reset) {
+		document.getElementById("history").innerHTML = "";
+	}
+	
+	renderCards(data, !reset);
+	
+	offset += data.length;
+	
+	if (data.length < limit) {
+		document.getElementById("loadMoreBtn").style.display = "none";
+	}
 }
 
 async function loadStats() {
@@ -81,15 +126,21 @@ async function loadStats() {
 }
 
 async function refreshUI() {
-	await loadHistory();
+	await loadHistory(true);
 	await loadStats();
 }
 
-function renderCards(data) {
+function formatEmotion(e) {
+	return e.charAt(0).toUpperCase() + e.slice(1);
+}
+
+function renderCards(data, append=false) {
 	
     const historyDiv = document.getElementById("history");
 	
-    historyDiv.innerHTML = "";
+	if (!append) {
+		historyDiv.innerHTML = "";
+	}
 	
 	if (data.length === 0) {
 		historyDiv.innerHTML = `
@@ -102,9 +153,26 @@ function renderCards(data) {
 
     data.forEach(entry => {
 	
-	    const emotionClass = getEmotionClass(entry.emotion);
+	    const emotionClasses = getEmotionClasses();
 		
 		const sentimentClass = getSentimentClass(entry.sentiment);
+		
+		const emotions = entry.emotion
+		    ? entry.emotion.split(",")
+			: [];
+		
+		let badgeString = "";
+		
+		if (emotions.length > 0 && emotions[0] !== "") {
+			badgeString = emotions.reduce((acc, emotion) => {
+				const cls = emotionClasses[emotion] || "bg-secondary-subtle text-dark";
+				const label = formatEmotion(emotion);
+				
+				return acc + `<span class="badge ${cls} me-2" style="min-width: 6vw">${label}</span>`;
+			}, "");
+		} else {
+			badgeString = `<span class="badge bg-secondary-subtle text-dark me-2" style="min-width: 6vw">Not Detected</span>`
+		}
 	
 	    const localTime = new Date(entry.timestamp + "Z").toLocaleString("en-US", {
             dateStyle: "medium",
@@ -127,14 +195,19 @@ function renderCards(data) {
 	    historyDiv.innerHTML += `
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
-    	            <div class="row">
-			            <div class="col-sm-2">
-				            <h3><span class="badge ${emotionClass} me-2" style="min-width: 8vw">${entry.emotion}</span></h3>
+    	            <div class="row mb-2">
+			            <div class="col-sm-8">
+						    <div class="d-flex align-items-center gap-3">
+							    <div class="d-flex gap-2">
+				                    <h3>${badgeString}</h3>
+								</div>
+								<span class="text-muted small mx-1">•</span>
+								<div class="d-flex gap-2">
+								    <h3><span class="badge ${sentimentClass}" style="min-width: 6vw">${formatEmotion(entry.sentiment)}</span></h3>
+								</div>
+							</div>
 				        </div>
-				        <div class="col-sm-2">
-				            <h3><span class="badge ${sentimentClass}" style="min-width: 8vw">${entry.sentiment}</span></h3>
-				        </div>
-				        <div class="col-sm-8"></div>
+				        <div class="col-sm-4"></div>
 					</div>
 					<div class="d-flex align-items-center justify-content-end h-100">
 					    <div class="p-2 flex-grow-1">
@@ -159,16 +232,17 @@ function renderCards(data) {
 	});
 }
 
-function formatEmotion(e) {
-	return e.charAt(0).toUpperCase() + e.slice(1);
-}
-
 async function renderStats(stats) {
+	
+	const cleanTopEmotions = stats.top_emotions.filter(
+	    e => e && e !== "not detected"
+	);
+	    
 	
 	document.getElementById("stats").innerHTML = `
 	    <div class="row mb-4">
 		    
-			<div class="col-md-3">
+			<div class="col-md-4">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Total Entries</h6>
@@ -177,7 +251,7 @@ async function renderStats(stats) {
 				</div>
 			</div>
 			
-			<div class="col-md-3">
+			<div class="col-md-2">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Positive</h6>
@@ -186,7 +260,7 @@ async function renderStats(stats) {
 				</div>
 			</div>
 			
-			<div class="col-md-3">
+			<div class="col-md-2">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Negative</h6>
@@ -195,7 +269,7 @@ async function renderStats(stats) {
 				</div>
 			</div>
 			
-			<div class="col-md-3">
+			<div class="col-md-2">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Neutral</h6>
@@ -204,15 +278,24 @@ async function renderStats(stats) {
 				</div>
 			</div>
 			
+			<div class="col-md-2">
+			    <div class="card shadow-sm text-center h-100">
+				    <div class="card-body">
+					    <h6 class="text-muted">Mixed Sentiment</h6>
+						<h3 class="text-info">${stats.mixed}</h3>
+					</div>
+				</div>
+			</div>
+			
 			<div class="col-12">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Top Emotion</h6>
-						<h2 class="text-success mt-3">${stats.top_emotions.length > 1
+						<h2 class="text-success mt-2">${cleanTopEmotions.length > 1
 						                            ? "Tie: "
 						                            : ""} 
-						                        ${stats.top_emotions.length
-						                            ? stats.top_emotions
+						                        ${cleanTopEmotions.length
+						                            ? cleanTopEmotions
 												       .map(formatEmotion)
 													   .join(" • ")
 													: "-"}</h2>
@@ -224,30 +307,17 @@ async function renderStats(stats) {
 	`;
 }
 
-function getEmotionClass(emotion) {
+function getEmotionClasses() {
 	
-	let emotionClass = "";
+	let emotionClasses = {
+		happy: "bg-success",
+		anger: "bg-danger",
+		sad: "bg-primary",
+		fear: "bg-warning text-dark",
+		disgust: "bg-dark",
+	};
 	
-	if (emotion === "happy") {
-		emotionClass = "bg-success";
-	}
-	else if (emotion === "anger") {
-	    emotionClass = "bg-danger";
-	}
-	else if (emotion === "sad") {
-	    emotionClass = "bg-primary";
-	}
-	else if (emotion === "fear") {
-	    emotionClass = "bg-warning text-dark";
-	}
-	else if (emotion === "disgust") {
-	    emotionClass = "bg-dark";
-	}
-	else {
-	    emotionClass = "bg-secondary";
-	}
-	
-	return emotionClass;
+	return emotionClasses;
 }
 
 function getSentimentClass(sentiment) {
@@ -259,6 +329,9 @@ function getSentimentClass(sentiment) {
     }
 	else if (sentiment === "negative") {
 	    sentimentClass = "bg-danger";
+	}
+	else if (sentiment === "mixed") {
+		sentimentClass = "bg-info text-dark";
 	}
 	else {
 	    sentimentClass = "bg-secondary";

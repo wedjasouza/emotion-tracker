@@ -5,6 +5,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select, func, desc
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
+from nlp import analyze_sentiment, analyze_emotion
 
 # add the templates
 
@@ -28,6 +29,7 @@ class StatsModel(BaseModel):
     positive: int
     negative: int
     neutral: int
+    mixed: int
     top_emotions: list[str] | None = None
 
 # create database
@@ -63,25 +65,18 @@ def analyze_text(text: str) -> tuple[str, str]:
     if not text:
         raise HTTPException(status_code=400, detail="No text provided")
 
-    if "happy" in text:
-        emotion = "happy"
-    elif "sad" in text:
-        emotion = "sad"
-    elif "angry" in text or "anger" in text:
-        emotion = "anger"
-    elif "fear" in text:
-        emotion = "fear"
-    elif "disgust" in text or "disgusted" in text:
-        emotion = "disgust"
-    else:
-        emotion = "not detected"
+    emotion = analyze_emotion(text)
 
-    if emotion == "happy":
-        sentiment = "positive"
-    elif emotion in ["anger", "sad", "fear", "disgust"]:
-        sentiment = "negative"
-    else:
-        sentiment = "neutral"
+    sentiment = analyze_sentiment(text)
+
+    positive_emotions = {"happy"}
+    negative_emotions = {"sad", "anger", "fear", "disgust"}
+
+    emotion_list = emotion if isinstance(emotion, list) else emotion.split(",") if emotion else []
+    emotion_set = set(emotion_list)
+
+    if emotion_set & positive_emotions and emotion_set & negative_emotions:
+        sentiment = "mixed"
 
     return emotion, sentiment
 
@@ -109,6 +104,8 @@ async def home(request: Request):
 async def get_entries(
         sentiment: str | None = None,
         emotion: str | None = None,
+        limit: int = 10,
+        offset: int = 0,
         session: Session = Depends(get_session)
 ):
     statement = select(Entry)
@@ -118,7 +115,11 @@ async def get_entries(
     if emotion:
         statement = statement.where(Entry.emotion == emotion)
 
-    statement = statement.order_by(Entry.timestamp.desc())
+    statement = (
+        statement.order_by(Entry.timestamp.desc())
+        .offset(offset)
+        .limit(limit)
+    )
 
     results = session.exec(statement).all()
 
@@ -149,8 +150,14 @@ async def get_stats(
         .where(Entry.sentiment == "neutral")
     ).one()
 
+    mixed_count = session.exec(
+        select(func.count()).select_from(Entry)
+        .where(Entry.sentiment == "mixed")
+    ).one()
+
     results = session.exec(
         select(Entry.emotion, func.count(Entry.id).label("emotion_totals"))
+        .where(Entry.emotion != "not detected")
         .group_by(Entry.emotion)
     ).all()
 
@@ -165,6 +172,7 @@ async def get_stats(
         positive=positive_count,
         negative=negative_count,
         neutral=neutral_count,
+        mixed=mixed_count,
         top_emotions=top_emotions
     )
 
