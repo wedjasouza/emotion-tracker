@@ -1,6 +1,6 @@
 # Emotion Tracker
 
-A full-stack web application that analyzes user text for **emotion** and **sentiment** using NLP, stores entries, and provides a real-time analytics dashboard.
+A full-stack web application that analyzes user text for **emotion** and **sentiment** using NLP, stores entries, and includes a real-time analytics dashboard.
 
 🔗 **Live Demo:** https://emotion-tracker-0ea4.onrender.com
 
@@ -8,21 +8,25 @@ A full-stack web application that analyzes user text for **emotion** and **senti
 
 ## 📸 Screenshots
 
+
+Explore the application interface across desktop and mobile views.
+
 ### 🖥️ Desktop
 
-<img src="./screenshots/desktop-home.png" width="400">
+<img src="./screenshots/desktop-home.png" width="300">
 
-<img src="./screenshots/desktop-stats.png" width="400">
+<img src="./screenshots/desktop-stats.png" width="300">
 
-<img src="./screenshots/desktop-history.png" width="400">
+<img src="./screenshots/desktop-history.png" width="300">
 
 ### 📱 Mobile
 
-<img src="./screenshots/mobile-home.png" width="400">
+<img src="./screenshots/mobile-home.png" width="300">
 
-<img src="./screenshots/mobile-stats.png" width="400">
+<img src="./screenshots/mobile-stats.png" width="300">
 
-<img src="./screenshots/mobile-history.png" width="400">
+<img src="./screenshots/mobile-history.png" width="300">
+
 
 ---
 
@@ -108,6 +112,7 @@ git clone https://github.com/wedjasouza/emotion-tracker.git
 cd emotion-tracker
 pip install -r requirements.txt
 uvicorn main:app --reload
+```
 
 ## 👨‍💻 Author
 
