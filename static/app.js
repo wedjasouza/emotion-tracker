@@ -143,10 +143,21 @@ function renderCards(data, append=false) {
 		historyDiv.innerHTML = "";
 	}
 	
-	if (data.length === 0) {
+	const emotion = document.getElementById("emotionFilter").value;
+	const sentiment = document.getElementById("sentimentFilter").value;
+	
+	const hasFilters =
+	    (emotion && emotion !== "All") ||
+		(sentiment && sentiment !== "All");
+		
+    if (data.length === 0) {
+		const message = hasFilters
+		    ? "No entries match the selected filters."
+			: "No entries yet. Enter some text above to analyze your first entry.";
+			
 		historyDiv.innerHTML = `
 		    <div class="alert alert-secondary">
-			    No entries match the selected filters.
+			    ${message}
 			</div>
 	    `;
 		return;
@@ -351,11 +362,11 @@ function filterParams() {
 	
 	const params = new URLSearchParams();
 	
-	if (emotion) {
+	if (emotion && emotion !== "All") {
 		params.append("emotion", emotion)
 	}
 	
-	if (sentiment) {
+	if (sentiment && sentiment !== "All") {
 		params.append("sentiment", sentiment)
 	}
 	
