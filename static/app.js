@@ -56,7 +56,8 @@ document.addEventListener("DOMContentLoaded", function() {
 	document.getElementById("emotionFilter").addEventListener("change", refreshUI)
 	document.getElementById("sentimentFilter").addEventListener("change", refreshUI)
 	
-    refreshUI();
+    loadStats();
+	loadHistory(true);
 	
 	document.getElementById("saveEditBtn").addEventListener("click", async function () {
 	    const text = document.getElementById("updateText").value;
@@ -74,12 +75,12 @@ document.addEventListener("DOMContentLoaded", function() {
 	
 	const loadMoreBtn = document.getElementById("loadMoreBtn")
 	
-	document.getElementById("loadMoreBtn").addEventListener("click", () => {
+	document.getElementById("loadMoreBtn").addEventListener("click", async () => {
 		try {
 			loadMoreBtn.disabled = true;
 			loadMoreBtn.textContent = "Loading...";
 			
-		    async loadHistory(false);
+		    await loadHistory(false);
 		} finally {
 			loadMoreBtn.disabled = false;
 			loadMoreBtn.textContent = "Load More";
@@ -195,34 +196,38 @@ function renderCards(data, append=false) {
 	    historyDiv.innerHTML += `
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
-    	            <div class="row mb-2">
-			            <div class="col-sm-8">
-						    <div class="d-flex align-items-center gap-3">
-							    <div class="d-flex gap-2">
-				                    <h3>${badgeString}</h3>
-								</div>
-								<span class="text-muted small mx-1">•</span>
-								<div class="d-flex gap-2">
-								    <h3><span class="badge ${sentimentClass}" style="min-width: 6vw">${formatEmotion(entry.sentiment)}</span></h3>
-								</div>
-							</div>
-				        </div>
+				    <div class="d-flex flex-wrap gap-2 mb-2">
+    	                <div class="row mb-2">
+			                <div class="col-sm-8">
+						        <div class="d-flex align-items-center gap-3">
+							        <div class="d-flex flex-wrap gap-2">
+				                        <h3>${badgeString}</h3>
+								    </div>
+								    <span class="text-muted small mx-1">•</span>
+								    <div class="d-flex gap-2">
+								        <h3><span class="badge ${sentimentClass}" style="min-width: 6vw">${formatEmotion(entry.sentiment)}</span></h3>
+								    </div>
+							    </div>
+				            </div>
 				        <div class="col-sm-4"></div>
+					    </div>
 					</div>
-					<div class="d-flex align-items-center justify-content-end h-100">
 					    <div class="p-2 flex-grow-1">
 					        <p class="card-text">${entry.text}</p>
 						</div>
-						<button
-						    class="btn btn-warning mb-3"
-							onclick="openEditModal(${entry.id}, \`${entry.text}\`)"
-							data-bs-toggle="modal"
-							data-bs-target="#editScreen"
-							style="min-width: 6vw">
-							EDIT
-						</button>
-						<div class="p-2"></div>
-				        <button onclick="deleteEntry(${entry.id})" type="button" class="btn btn-danger mb-3" style="min-width: 6vw">DELETE</button>
+					<div class="d-flex align-items-center justify-content-end h-100">
+						<div class="d-flex gap-2">
+						    <button
+						        class="btn btn-warning mb-3 text-nowrap"
+							    onclick="openEditModal(${entry.id}, \`${entry.text}\`)"
+							    data-bs-toggle="modal"
+							    data-bs-target="#editScreen"
+							    style="min-width: 6vw">
+							    EDIT
+						    </button>
+						    <div class="p-2"></div>
+				            <button onclick="deleteEntry(${entry.id})" type="button" class="btn btn-danger mb-3 text-nowrap" style="min-width: 6vw">DELETE</button>
+						</div>
 			        </div>
 		    	    <small><small class="text-muted d-block mb-2">Created: ${localTime} ${editedHtml}</small></small>
                 </div>
@@ -287,7 +292,7 @@ async function renderStats(stats) {
 				</div>
 			</div>
 			
-			<div class="col-12">
+			<div class="col-12 mb-5">
 			    <div class="card shadow-sm text-center h-100">
 				    <div class="card-body">
 					    <h6 class="text-muted">Top Emotion</h6>
